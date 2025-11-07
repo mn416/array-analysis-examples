@@ -306,11 +306,11 @@ end subroutine
 
 Inside the `j` loop, each array element `idx1` is considered for swapping with
 its partner element `idx2`.  The partner pairs are unique and hence
-non-conflicting.  The arthmetic to compute a partner pairs is quite complex,
-involving `+`, `-`, `*`, `/`, `mod` and `min`, but the analysis can handle it:
+non-conflicting.  The arthmetic to compute a partner pairs is quite complex
+but the analysis can handle it:
 
 ```f90
-psyclone -s analyse.py -o /dev/null examples/oem_sort.f90 
+$ psyclone -s analyse.py -o /dev/null examples/oem_sort.f90 
 Routine: odd_even_merge_sort
   Loop log_p: conflicts
   Loop log_k: conflicts
@@ -351,7 +351,7 @@ end subroutine
 The analysis can also handle this example:
 
 ```
-psyclone -s analyse.py -o /dev/null examples/bitonic_sort.f90        
+$ psyclone -s analyse.py -o /dev/null examples/bitonic_sort.f90        
 Routine: bitonic_sort
   Loop log_k: conflicts
   Loop log_j: conflicts
@@ -381,7 +381,7 @@ end subroutine
 Unfortunately, the default analysis times out on this example:
 
 ```
-psyclone -s analyse.py -o /dev/null examples/chunking.f90 
+$ psyclone -s analyse.py -o /dev/null examples/chunking.f90 
 Routine: chunking
   Loop i: timeout
 ```
@@ -400,7 +400,7 @@ solver succeeds.
 
 ## Result Summary
 
-The following table summaraises the different analysis options for each
+The following table summarises the different analysis options for each
 example.  We use "yes" to mean that the solver succeeds in finding all the
 non-conflicting loops, and a blank box to mean that it doesn't. The `-oflow`
 tag means "integer overflow is probibited".
