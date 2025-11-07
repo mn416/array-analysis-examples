@@ -1,0 +1,14 @@
+diff --git a/src/fparser/two/Fortran2003.py b/src/fparser/two/Fortran2003.py
+index 6497dac..21bc463 100644
+--- a/src/fparser/two/Fortran2003.py
++++ b/src/fparser/two/Fortran2003.py
+@@ -12231,6 +12231,9 @@ class Intrinsic_Name(STRINGBase):  # No explicit rule
+         "NINT": {"min": 1, "max": 2},
+         "REAL": {"min": 1, "max": 2},
+         "SIGN": {"min": 2, "max": 2},
++        "SHIFTL": {"min": 2, "max": 2},
++        "SHIFTR": {"min": 2, "max": 2},
++        "SHIFTA": {"min": 2, "max": 2},
+     }
+ 
+     mathematical_names = {
