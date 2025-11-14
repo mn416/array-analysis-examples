@@ -2,6 +2,8 @@ import os
 from psyclone.psyir.nodes import Loop, Routine
 from psyclone.psyir.tools.array_index_analysis import ArrayIndexAnalysis
 
+RESOLVE_IMPORTS = True
+
 class Colour:
   HEADER = '\033[95m'
   OKBLUE = '\033[94m'

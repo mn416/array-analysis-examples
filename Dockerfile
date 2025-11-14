@@ -56,7 +56,7 @@ RUN printf "\
 \nset nowrapscan \
 \nnmap <C-Up> k?^\! ===<CR>kzt \
 \nnmap <C-Down> jj/^\! ===<CR>kzt \
-\nxmap <Space> :w !cat > /tmp/file.F90 && clear && echo Running existing analysis... && psyclone -s existing.py -o /dev/null /tmp/file.F90 && echo && echo Running new analysis... && psyclone -s new.py -o /dev/null /tmp/file.F90<CR>\n" >> /home/dev-user/.vimrc
+\nxmap <Space> :w !cat > /tmp/file.F90 && clear && echo Running existing analysis... && psyclone -s omp.py -o /dev/null /tmp/file.F90 && echo && echo Running new analysis... && psyclone -s analyse.py -o /dev/null /tmp/file.F90<CR>\n" >> /home/dev-user/.vimrc
 
 # Entrypoint set up
 WORKDIR workspace
