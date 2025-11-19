@@ -25,8 +25,8 @@ def trans(psyir):
   bv_width = int(os.getenv("BITVEC_WIDTH", "32"))
   use_int = os.getenv("USE_INTEGERS", "no")
   use_bitvec = os.getenv("USE_BITVEC", "no")
-  no_overflow = os.getenv("PROHIBIT_OVERFLOW", "no")
-  handle_array_intrins = os.getenv("HANDLE_ARRAY_INTRINS", "no")
+  no_overflow = os.getenv("PROHIBIT_OVERFLOW", "yes")
+  handle_array_intrins = os.getenv("HANDLE_ARRAY_INTRINS", "yes")
 
   num_routines = 0
   num_loops = []
