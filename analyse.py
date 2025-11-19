@@ -1,6 +1,7 @@
 import os
 from psyclone.psyir.nodes import Loop, Routine
-from psyclone.psyir.tools.array_index_analysis import ArrayIndexAnalysis
+from psyclone.psyir.tools.array_index_analysis import (
+  ArrayIndexAnalysis, ArrayIndexAnalysisOptions)
 
 RESOLVE_IMPORTS = True
 
@@ -17,18 +18,26 @@ class Colour:
 
 def trans(psyir):
   timeout = int(os.getenv("TIMEOUT", "10000"))
-  int_width = int(os.getenv("INTEGER_WIDTH", "32"))
+  bv_width = int(os.getenv("BITVEC_WIDTH", "32"))
   use_int = os.getenv("USE_INTEGERS", "no")
+  use_bitvec = os.getenv("USE_BITVEC", "no")
   no_overflow = os.getenv("PROHIBIT_OVERFLOW", "no")
+
+  use_bv = None
+  if use_int == "yes":
+    use_bv = False
+  elif use_bitvec == "yes":
+    use_bv = True
+
   for routine in psyir.walk(Routine):
     print("Routine: ", Colour.OKBLUE, routine.name, Colour.ENDC, sep="")
     for loop in routine.walk(Loop):
       print("  Loop ",
             Colour.OKBLUE, loop.variable.name, Colour.ENDC,
             ": ", sep="", end="", flush=True)
-      options = ArrayIndexAnalysis.Options(
-                  int_width = int_width,
-                  use_bv = not (use_int == "yes"),
+      options = ArrayIndexAnalysisOptions(
+                  int_width = bv_width,
+                  use_bv = use_bv,
                   smt_timeout_ms = timeout,
                   prohibit_overflow = no_overflow == "yes")
       conflict_free = ArrayIndexAnalysis(options).is_loop_conflict_free(loop)

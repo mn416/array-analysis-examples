@@ -68,20 +68,6 @@ Routine: reverse
   Loop i: conflicts
 ```
 
-Note that, as there are multiple references to the size of the array, it is
-important to capture the size once via the statement `n = size(arr)` rather
-than write `size(arr)` multiple times. This is because the analysis currently
-doesn't have any special knowledge of the `size` intrinsic (it assumes it could
-return anything, and not necessarily the same thing each time). To prove that
-there are no conflicts in this example, the analysis only requires that each
-reference to the array size is the same, which can be achieved using the
-assignment statement.
-
-(In future, we could use SMT _uninterpreted functions_ to model intrinsics such
-as `size`. An uninterpreted function can return any value but must return the
-same value each time. We might also constrain the return value to be greater
-than or equal to zero, if the Fortran standard does indeed guarantee that.)
-
 ## Example 2: Knuth's Odd/Even Transposition
 
 The routine in [odd_even_trans.f90](examples/odd_even_trans.f90), from Knuth's
@@ -121,19 +107,15 @@ subroutine my_matmul(a, b, c)
   integer, dimension(:,:), intent(in) :: a
   integer, dimension(:,:), intent(in) :: b
   integer, dimension(:,:), intent(out) :: c
-  integer :: x, y, k, k_out_var, x_out_var, y_out_var, a1_n, a2_n, b1_n
-
-  a2_n = size(a, 2)
-  b1_n = size(b, 1)
-  a1_n = size(a, 1)
+  integer :: x, y, k, k_tile, x_tile, y_tile
 
   c(:,:) = 0
-  do y_out_var = 1, a2_n, 8
-    do x_out_var = 1, b1_n, 8
-      do k_out_var = 1, a1_n, 8
-        do y = y_out_var, min(y_out_var + (8 - 1), a2_n), 1
-          do x = x_out_var, min(x_out_var + (8 - 1), b1_n), 1
-            do k = k_out_var, min(k_out_var + (8 - 1), a1_n), 1
+  do y_tile = 1, size(a, 2), 8
+    do x_tile = 1, size(b, 1), 8
+      do k_tile = 1, size(a, 1), 8
+        do y = y_tile, min(y_tile + (8 - 1), size(a, 2)), 1
+          do x = x_tile, min(x_tile + (8 - 1), size(b, 1)), 1
+            do k = k_tile, min(k_tile + (8 - 1), size(a, 1)), 1
               c(x,y) = c(x,y) + a(k,y) * b(x,k)
             enddo
           enddo
@@ -184,51 +166,17 @@ subroutine flatten(mat, arr)
 end subroutine
 ```
 
-When developing this example, my expectation was that both loops would be
-parallelisable, but the analysis reports:
+The analysis reports:
 
 ```
-Routine: flatten
-  Loop y: conflicts
-  Loop x: conflict free
-```
-
-After some thought, it is apparant that the outer loop does indeed contain a
-conflict if integers wrap around due to integer overflow. However, as integer
-overflow is undefined behaviour in Fortran, it is reasonable for the analysis
-to ignore it. This can be done using one of two approaches. In the first
-approach, we tell the analysis to model Fortran integers as
-arbitrary-precision integers rather than 32-bit vectors:
-
-```
-$ USE_INTEGERS=yes psyclone -s analyse.py -o /dev/null examples/flatten.f90
 Routine: flatten
   Loop y: conflict free
   Loop x: conflict free
 ```
 
-Success!
-
-In the second approach, we stick with the use of bit vectors but prohibit
-overflow:
-
-```
-$ PROHIBIT_OVERFLOW=yes psyclone -s analyse.py -o /dev/null examples/flatten.f90
-Routine: flatten
-  Loop y: timeout
-  Loop x: conflict free
-```
-
-Unfortunately, this approach leads to a solver timeout for the outer loop.
-Although somewhat unsatisfactory, the solver does succeed if we tell the
-analysis to model Fortran integers as 8 bits instead of 32:
-
-```
-INTEGER_WIDTH=8 PROHIBIT_OVERFLOW=yes psyclone -s analyse.py -o /dev/null examples/flatten.f90
-Routine: flatten
-  Loop y: conflict free
-  Loop x: conflict free
-```
+Note that loop `y` can actually conflict in practice, if integer overflow
+leads to wrap-around. However, integer overflow is undefined behaviour in
+Fortran, so the analysis ignore its.
 
 ## Example 5: Gauss/Jordan Method
 
@@ -358,7 +306,76 @@ Routine: bitonic_sort
   Loop i: conflict free
 ```
 
-## Example 8: Array Chunking
+## Example 8: Parallel Prefix
+
+The following routine computes the parallel prefix sum of an array.
+
+```f90
+subroutine parallel_prefix_sum(arr, chunk_size)
+  integer, intent(inout) :: arr(0:)
+  integer, intent(in) :: chunk_size
+  integer :: inc_by(0:chunk_size-1)
+  integer :: n, chunk_begin, chunk_end, chunk_id, i, acc
+
+  n = size(arr)
+  do chunk_begin = 0, n-1, chunk_size
+    chunk_end = min(chunk_begin + chunk_size - 1, n-1)
+    acc = 0
+    do i = chunk_begin, chunk_end
+      acc = acc + arr(i)
+      arr(i) = acc
+    end do
+  end do
+
+  acc = 0
+  do chunk_begin = 0, n-1, chunk_size
+    chunk_end = min(chunk_begin + chunk_size - 1, n-1)
+    chunk_id = chunk_begin / chunk_size
+    inc_by(chunk_id) = acc
+    acc = acc + arr(chunk_end)
+  end do
+
+  do chunk_begin = chunk_size, n-1, chunk_size
+    chunk_end = min(chunk_begin + chunk_size - 1, n-1)
+    chunk_id = chunk_begin / chunk_size
+    do i = chunk_begin, chunk_end
+      arr(i) = arr(i) + inc_by(chunk_id)
+    end do
+  end do
+end subroutine
+```
+
+The idea is to set `chunk_size` to the number of available threads, and to
+parallelise the first and final `chunk_begin` loops, which the analysis finds
+are conflict free:
+
+```
+$ psyclone -s analyse.py -o /dev/null examples/parallel_prefix.f90 
+Routine: parallel_prefix_sum
+  Loop chunk_begin: conflict free
+  Loop i: conflict free
+  Loop chunk_begin: conflict free
+  Loop chunk_begin: conflict free
+  Loop i: conflict free
+```
+
+Note that `analyse.py` only considers array accesses.  The first `i` loop and
+the first `chunk_begin` loop both contain scalar conflicts, which are handled
+by the existing `DependencyTools`. We can use `parallelise.py` instead of
+`analyse.py` to explore `DependencyTools` and `ArrayIndexAnalysis` in
+combination:
+
+```
+$ USE_SMT=yes psyclone -s parallelise.py -o /dev/null examples/parallel_prefix.f90
+Routine parallel_prefix_sum: 
+  Loop chunk_begin: conflict free
+  Loop i: conflicts
+  Loop chunk_begin: conflicts
+  Loop chunk_begin: conflict free
+  Loop i: conflict free
+```
+
+## Example 9: Array Chunking
 
 Handling tiled/chunked loops was one of the motivations for this work, so it is
 worth exploring this area in more detail. Unlike in the `matmul.f90` example,
@@ -366,69 +383,112 @@ the chunk size in [chunking.f90](examples/chunking.f90) is not statically
 known:
 
 ```f90
-subroutine chunking(arr, chunk_size)
-  integer, dimension(:), intent(inout) :: arr
-  integer, intent(in) :: chunk_size
-  integer :: i, n
+module chunking_example
+contains
+  subroutine chunking(arr, chunk_size)
+    integer, dimension(:), intent(inout) :: arr
+    integer, intent(in) :: chunk_size
+    integer :: i, n
 
-  n = size(arr)
-  do i = 1, n, chunk_size
-    arr(i:i+chunk_size-1) = 0
-  end do
-end subroutine
+    n = size(arr)
+    do i = 1, n, chunk_size
+      call modify(arr(i:i+chunk_size-1))
+    end do
+  end subroutine
+
+  pure subroutine modify(a)
+    integer, intent(inout) :: a(:)
+  end subroutine
+end module
 ```
 
-Unfortunately, the default analysis times out on this example:
+In this example, the `i` loop passes a different slice to the pure `modify`
+routine on eac iteration, and is conflict free:
 
 ```
 $ psyclone -s analyse.py -o /dev/null examples/chunking.f90 
 Routine: chunking
-  Loop i: timeout
-```
-
-However, the arbitrary-precision-integer solver succeeds:
-
-```
-USE_INTEGERS=yes psyclone -s analyse.py -o /dev/null examples/chunking.f90 
-Routine: chunking
   Loop i: conflict free
 ```
 
-The situation is similar when using run-time chunk size in
-[matmul.f90](examples/matmul.f90): the bit-vector solver fails but the integer
-solver succeeds.
+If we change the call to `modify` to
+
+```f90
+call modify(arr(i:i+chunk_size))
+```
+
+then the slices become overlapping between iterations, and the analysis
+reports a conflict.
 
 ## Result Summary
 
-The following table summarises the different analysis options for each
-example.  We use "yes" to mean that the solver succeeds in finding all the
-non-conflicting loops, and a blank box to mean that it doesn't. The `-oflow`
-tag means "integer overflow is probibited".
+All of the above examples contain one or more parallelisable loops that
+existing analysis does not parallelise.
 
-|                  | 32 bit | Integer | 32 bit, -oflow | 8 bit, -oflow |
-| ---              | ---    | ---     | ---            | ---           |
-| `reverse`        | yes    | yes     | yes            | yes           |
-| `odd_even_trans` | yes    | yes     | yes            | yes           |
-| `matmul`         | yes    | yes     | yes            | yes           |
-| `flatten`        |        | yes     |                | yes           |
-| `gauss_jordan`   | yes    | yes     | yes            | yes           |
-| `oem_sort`       | yes    |         | yes            | yes           |
-| `bitonic_sort`   | yes    |         | yes            | yes           |
-| `chunking`       |        | yes     |                | yes           |
+The `ArrayIndexAnalysis` can run in various modes:
 
-It is pleasing that each example can be handled either by the integer solver or
-by the 32-bit bit-vector solver.
+  * `Integer`: Fortran integers are interepreted as arbitrary precision
+    integers by the SMT solver.
 
-The following table shows how the existing PSyclone loop analysis fares on the
-same examples.
+  * `32 Bit`: Fortran integers are interepreted as 32-bit bit vectors
+     by the solver, and bit-vector overflow is explicitly ignored.
 
-| Routine          | Finds all parallelisable loops? |
-| ---              | ---                             |
-| `reverse`        | no                              |
-| `odd_even_trans` | no                              |
-| `matmul`         | no                              |
-| `flatten`        | no                              |
-| `gauss_jordan`   | no                              |
-| `oem_sort`       | no                              |
-| `bitonic_sort`   | no                              |
-| `chunking`       | no                              |
+  * `8 Bit`: Fortran integers are interepreted as 8-bit bit vectors
+     by the solver, and bit-vector overflow is explicitly ignored.
+
+  * `Default`: same as `Integer` mode unless the routine enclosing the loop
+    uses bit vector operations (shift/bitwise intrinsics), in which case it
+    is the same as `32 Bit` mode.
+
+The following table summarises the results of the `ArrayIndexAnalysis` in the
+various modes. We use "yes" to mean that the solver succeeds in finding all
+the non-conflicting loops, and a blank box to mean that it doesn't.
+
+|                   | Default | Integer | 32 Bit | 8 Bit |
+| ---               | ---     | ---     | ---    | ---   |
+| `reverse`         | yes     | yes     | yes    | yes   |
+| `odd_even_trans`  | yes     | yes     | yes    | yes   |
+| `matmul`          | yes     | yes     | yes    | yes   |
+| `flatten`         | yes     | yes     |        | yes   |
+| `gauss_jordan`    | yes     | yes     | yes    | yes   |
+| `oem_sort`        | yes     |         | yes    | yes   |
+| `bitonic_sort`    | yes     |         | yes    | yes   |
+| `parallel_prefix` | yes     | yes     |        | yes   |
+| `chunking`        | yes     | yes     |        | yes   |
+
+In addition to these examples, there are a number of simple examples in
+[simple.f90](examples/simple.f90) in which the existing analysis fails but
+`ArrayIndexAnalysis` succeeds:
+
+```
+$ USE_SMT=yes psyclone -s parallelise.py -o /dev/null examples/simple.f90
+Routine copy_array: 
+  Loop i: conflict free
+Routine injective_index: 
+  Loop i: conflict free
+Routine double_inner_loop: 
+  Loop i: conflict free
+  Loop j: conflict free
+  Loop k: conflict free
+Routine last_iteration: 
+  Loop i: conflict free
+Routine invariant_if: 
+  Loop i: conflict free
+Routine one_elem_slice: 
+  Loop i: conflict free
+Routine extend_array: 
+  Loop i: conflict free
+Routine main: 
+  Loop i: conflict free
+Routine modify: 
+Routine main: 
+  Loop i: conflict free
+Routine modify: 
+Routine triangular_loop: 
+  Loop i: conflicts
+  Loop j: conflict free
+```
+
+Finally, [beware.f90](examples/beware.f90) contains some examples that
+illustrate bugs in the existing `DepdendencyTools` analysis. These have been
+reported on the PSyclone issue tracker.
