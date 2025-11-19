@@ -422,9 +422,6 @@ reports a conflict.
 
 ## Result Summary
 
-All of the above examples contain one or more parallelisable loops that
-existing analysis does not parallelise.
-
 The `ArrayIndexAnalysis` can run in various modes:
 
   * `Integer`: Fortran integers are interepreted as arbitrary precision
@@ -488,6 +485,9 @@ Routine triangular_loop:
   Loop i: conflicts
   Loop j: conflict free
 ```
+
+All of the examples discussed up to now contain one or more parallelisable
+loops that existing analysis in PSyclone does not parallelise.
 
 Finally, [beware.f90](examples/beware.f90) contains some examples that
 illustrate bugs in the existing `DepdendencyTools` analysis. These have been
