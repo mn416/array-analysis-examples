@@ -122,3 +122,20 @@ subroutine triangular_loop(arr)
     end do
   end do
 end subroutine
+
+module elemental_function
+contains
+  subroutine main()
+    integer :: i
+    integer :: arr(10)
+    do i = 1, size(arr)
+      arr(i) = inc(arr(i))
+    end do
+  end subroutine
+
+  pure elemental function inc(x) result(y)
+    integer, intent(in) :: x
+    integer :: y
+    y = x+1
+  end function
+end module

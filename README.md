@@ -78,7 +78,7 @@ subroutine odd_even_transposition(arr, start)
   integer , intent(inout) :: arr(:)
   integer, intent(in) :: start
   integer :: i, tmp
-  do i = start, size(arr), 2
+  do i = start, size(arr)-1, 2
     if (arr(i) > arr(i+1)) then
       tmp = arr(i+1)
       arr(i+1) = arr(i)
@@ -145,7 +145,56 @@ Routine: my_matmul
   Loop k: conflicts
 ```
 
-## Example 4: Array Flattening
+## Example 4: Array Chunking
+
+Handling tiled/chunked loops was one of the motivations for this work, so it is
+worth exploring this area in more detail. Unlike in the `matmul.f90` example,
+the chunk size in [chunking.f90](examples/chunking.f90) is not statically
+known:
+
+```f90
+module chunking_example
+contains
+
+  subroutine chunking(arr, chunk_size)
+    integer, dimension(:), intent(inout) :: arr
+    integer, intent(in) :: chunk_size
+    integer :: n, chunk_begin, chunk_end
+
+    n = size(arr)
+    do chunk_begin = 1, n, chunk_size
+      chunk_end = min(chunk_begin+chunk_size-1, n)
+      call modify(arr(chunk_begin:chunk_end))
+    end do
+  end subroutine
+
+  pure subroutine modify(a)
+    integer, intent(inout) :: a(:)
+  end subroutine
+
+end module
+```
+
+In this example, the `i` loop passes a different slice to the pure `modify`
+routine on each iteration, and is conflict free:
+
+```
+$ psyclone -s analyse.py -o /dev/null examples/chunking.f90 
+Routine chunking: 
+  Loop chunk_begin: conflict free
+Routine sub: 
+```
+
+If we change change the value of `chunk_end` to
+
+```f90
+chunk_end = min(chunk_begin+chunk_size, n)
+```
+
+then the slices become overlapping between iterations, and the analysis
+reports a conflict.
+
+## Example 5: Array Flattening
 
 The [flatten.f90](examples/flatten.f90) example contains the following
 routine.
@@ -176,9 +225,9 @@ Routine: flatten
 
 Note that loop `y` can actually conflict in practice, if integer overflow
 leads to wrap-around. However, integer overflow is undefined behaviour in
-Fortran, so the analysis ignore its.
+Fortran, so the analysis ignores it.
 
-## Example 5: Gauss/Jordan Method
+## Example 6: Gauss/Jordan Method
 
 The routine in [gauss_jordan.f90](examples/gauss_jordan.f90) is taken from a
 [tutorial on numerical
@@ -206,7 +255,7 @@ end subroutine
 The interesting question here is whether the `i` loop is parallelisable. Each
 iteration writes `a(i,j)` (for all `j`) and reads `a(k,j)` (for all `j` and a
 fixed `k`) but, due to the `if` condition `i /= k`, these accesses are
-non-overlapping.  The analysis knows this:
+non-overlapping.  The analysis infers this:
 
 ```
 $ psyclone -s analyse.py -o /dev/null examples/gauss_jordan.f90
@@ -216,7 +265,7 @@ Routine: gauss_jordan
   Loop j: conflict free
 ```
 
-## Example 6: Batcher's Odd/Even Merge Sort
+## Example 7: Batcher's Odd/Even Merge Sort
 
 As a more complex example,
 [oem_sort.f90](examples/oem_sort.f90) contains Batcher's
@@ -266,7 +315,7 @@ Routine: odd_even_merge_sort
   Loop i: conflict free
 ```
 
-## Example 7: Batcher's Bitonic Sort
+## Example 8: Batcher's Bitonic Sort
 
 The routine in [bitonic_sort.f90](examples/bitonic_sort.f90) is similar to the above example and has been ported to Fortran from C code in a
 [tutorial on sorting](https://sortvisualizer.com/bitonicsort/).
@@ -306,9 +355,10 @@ Routine: bitonic_sort
   Loop i: conflict free
 ```
 
-## Example 8: Parallel Prefix
+## Example 9: Parallel Prefix
 
-The following routine computes the parallel prefix sum of an array.
+The routine in [parallel_prefix.f90](examples/parallel_prefix.f90) computes the
+parallel prefix sum of an array.
 
 ```f90
 subroutine parallel_prefix_sum(arr, chunk_size)
@@ -375,51 +425,6 @@ Routine parallel_prefix_sum:
   Loop i: conflict free
 ```
 
-## Example 9: Array Chunking
-
-Handling tiled/chunked loops was one of the motivations for this work, so it is
-worth exploring this area in more detail. Unlike in the `matmul.f90` example,
-the chunk size in [chunking.f90](examples/chunking.f90) is not statically
-known:
-
-```f90
-module chunking_example
-contains
-  subroutine chunking(arr, chunk_size)
-    integer, dimension(:), intent(inout) :: arr
-    integer, intent(in) :: chunk_size
-    integer :: i, n
-
-    n = size(arr)
-    do i = 1, n, chunk_size
-      call modify(arr(i:i+chunk_size-1))
-    end do
-  end subroutine
-
-  pure subroutine modify(a)
-    integer, intent(inout) :: a(:)
-  end subroutine
-end module
-```
-
-In this example, the `i` loop passes a different slice to the pure `modify`
-routine on eac iteration, and is conflict free:
-
-```
-$ psyclone -s analyse.py -o /dev/null examples/chunking.f90 
-Routine: chunking
-  Loop i: conflict free
-```
-
-If we change the call to `modify` to
-
-```f90
-call modify(arr(i:i+chunk_size))
-```
-
-then the slices become overlapping between iterations, and the analysis
-reports a conflict.
-
 ## Result Summary
 
 The `ArrayIndexAnalysis` can run in various modes:
@@ -446,12 +451,12 @@ the non-conflicting loops, and a blank box to mean that it doesn't.
 | `reverse`         | yes     | yes     | yes    | yes   |
 | `odd_even_trans`  | yes     | yes     | yes    | yes   |
 | `matmul`          | yes     | yes     | yes    | yes   |
+| `chunking`        | yes     | yes     |        | yes   |
 | `flatten`         | yes     | yes     |        | yes   |
 | `gauss_jordan`    | yes     | yes     | yes    | yes   |
 | `oem_sort`        | yes     |         | yes    | yes   |
 | `bitonic_sort`    | yes     |         | yes    | yes   |
 | `parallel_prefix` | yes     | yes     |        | yes   |
-| `chunking`        | yes     | yes     |        | yes   |
 
 In addition to these examples, there are a number of simple examples in
 [simple.f90](examples/simple.f90) in which the existing analysis fails but
@@ -484,10 +489,13 @@ Routine modify:
 Routine triangular_loop: 
   Loop i: conflicts
   Loop j: conflict free
+Routine main: 
+  Loop i: conflict free
+Routine inc: 
 ```
 
-All of the examples discussed up to now contain one or more parallelisable
-loops that existing analysis in PSyclone does not parallelise.
+All of the examples thus far contain one or more parallelisable loops that
+existing analysis in PSyclone does not parallelise.
 
 Finally, [beware.f90](examples/beware.f90) contains some examples that
 illustrate bugs in the existing `DepdendencyTools` analysis. These have been

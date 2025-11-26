@@ -9,8 +9,8 @@ FILES=`find * -name '*.F90'`
 IGNORE=""
 
 # List of include directories for PSyclone to search for imports
-INC=""
-#INC=`find *  -type d | xargs -i echo "-I {}" | xargs`
+#INC=""
+INC=`find *  -type d | xargs -i echo "-I {}" | xargs`
 
 for FILE in $FILES; do
   OUT_PREFIX=$(echo $FILE | tr '/' '-' | xargs -i basename {} .F90)
@@ -18,8 +18,8 @@ for FILE in $FILES; do
     echo Ignoring $OUT_PREFIX
   else
     echo $OUT_PREFIX
-    (time psyclone $INC -s /workspace/omp.py -o /dev/null $FILE) > $OUT_PREFIX.old 2> $OUT_PREFIX.old.err
-    (time TIMEOUT=5000 USE_SMT=yes psyclone $INC -s /workspace/omp.py -o /dev/null $FILE) > $OUT_PREFIX.new 2> $OUT_PREFIX.new.err
+    (time psyclone $INC -s /workspace/parallelise.py -o /dev/null $FILE) > $OUT_PREFIX.old 2> $OUT_PREFIX.old.err
+    (time TIMEOUT=5000 USE_SMT=yes psyclone $INC -s /workspace/parallelise.py -o /dev/null $FILE) > $OUT_PREFIX.new 2> $OUT_PREFIX.new.err
     diff $OUT_PREFIX.old $OUT_PREFIX.new > $OUT_PREFIX.diff
     N1=$(grep conflict $OUT_PREFIX.old | wc -l)
     N2=$(grep conflict $OUT_PREFIX.new | wc -l)
