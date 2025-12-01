@@ -15,8 +15,9 @@ $ git clone --recursive \
 ```
 
 If for some reason the branch does not exist, it could be that the analysis has
-been merged or rejected. In the former case, simply drop the branch name. In
-the latter, use my PSyclone fork instead: `https://github.com/mn416/PSyclone`.
+been merged or rejected by the PSyclone team. In the former case, simply drop
+the branch name in the above command. In the latter, keep the branch name but
+use my PSyclone fork instead: `https://github.com/mn416/PSyclone`.
 
 Apply a patch to the fparser submodule to support Fortran 2008 bit-shifting
 intrinsics, which are useful in some of the examples:
@@ -148,6 +149,10 @@ Routine: my_matmul
   Loop x: conflict free
   Loop k: conflicts
 ```
+
+The routine in [transpose.f90](examples/transpose.f90) is a similar example,
+the only slight difference being that the chunk size is taken as a parameter
+rather than being a literal value.
 
 ## Example 4: Array Chunking
 
@@ -455,6 +460,7 @@ the non-conflicting loops, and a blank box to mean that it doesn't.
 | `reverse`         | yes     | yes     | yes    | yes   |
 | `odd_even_trans`  | yes     | yes     | yes    | yes   |
 | `matmul`          | yes     | yes     | yes    | yes   |
+| `tranpose`        | yes     | yes     |        | yes   |
 | `chunking`        | yes     | yes     |        | yes   |
 | `flatten`         | yes     | yes     |        | yes   |
 | `gauss_jordan`    | yes     | yes     | yes    | yes   |
