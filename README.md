@@ -1,7 +1,7 @@
 # ArrayIndexAnalysis Examples
 
 This repo contains examples demonstrating our SMT-based ArrayIndexAnalysis for PSyclone.  The analysis itself is defined in
-[array_index_analysis.py](https://github.com/stfc/PSyclone/blob/mn416-smt-array-index-analysis/src/psyclone/psyir/tools/array_index_analysis.py),
+[array_index_analysis.py](https://github.com/mn416/PSyclone/blob/mn416-smt-array-index-analysis/src/psyclone/psyir/tools/array_index_analysis.py),
 which contains a fairly detailed description in the comments.
 
 ## Getting started
@@ -11,13 +11,8 @@ Recursively clone the PSyclone branch containing the analysis:
 ```
 $ git clone --recursive \
             -b mn416-smt-array-index-analysis \
-            https://github.com/stfc/PSyclone
+            https://github.com/mn416/PSyclone
 ```
-
-If for some reason the branch does not exist, it could be that the analysis has
-been merged or rejected by the PSyclone team. In the former case, simply drop
-the branch name in the above command. In the latter, keep the branch name but
-use my PSyclone fork instead: `https://github.com/mn416/PSyclone`.
 
 Apply a patch to the fparser submodule to support Fortran 2008 bit-shifting
 intrinsics, which are useful in some of the examples:
