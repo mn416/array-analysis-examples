@@ -55,8 +55,11 @@ def trans(psyir):
           elif use_bitvec == "yes":
             use_bv = True
           anal_opts = ArrayIndexAnalysisOptions(
-            bv_width, use_bv, timeout, no_overflow == "yes",
-            handle_array_intrins == "yes")
+                 int_width = bv_width,
+                 use_bv = use_bv,
+                 smt_timeout_ms = timeout,
+                 prohibit_overflow = no_overflow == "yes",
+                 handle_array_intrins = handle_array_intrins == "yes")
           OMPLoopTrans(omp_directive="paralleldo").apply(
             loop, use_smt_array_index_analysis=anal_opts)
         else:

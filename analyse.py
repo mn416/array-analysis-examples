@@ -17,11 +17,11 @@ class Colour:
   UNDERLINE = '\033[4m'
 
 def trans(psyir):
-  timeout = int(os.getenv("TIMEOUT", "10000"))
+  timeout = int(os.getenv("TIMEOUT", "5000"))
   bv_width = int(os.getenv("BITVEC_WIDTH", "32"))
   use_int = os.getenv("USE_INTEGERS", "no")
   use_bitvec = os.getenv("USE_BITVEC", "no")
-  no_overflow = os.getenv("PROHIBIT_OVERFLOW", "no")
+  no_overflow = os.getenv("PROHIBIT_OVERFLOW", "yes")
 
   use_bv = None
   if use_int == "yes":

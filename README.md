@@ -14,6 +14,10 @@ $ git clone --recursive \
             https://github.com/stfc/PSyclone
 ```
 
+If for some reason the branch does not exist, it could be that the analysis has
+been merged or rejected. In the former case, simply drop the branch name. In
+the latter, use my PSyclone fork instead: `https://github.com/mn416/PSyclone`.
+
 Apply a patch to the fparser submodule to support Fortran 2008 bit-shifting
 intrinsics, which are useful in some of the examples:
 
