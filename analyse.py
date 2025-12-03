@@ -1,7 +1,9 @@
 import os
+import time
 from psyclone.psyir.nodes import Loop, Routine
 from psyclone.psyir.tools.array_index_analysis import (
   ArrayIndexAnalysis, ArrayIndexAnalysisOptions)
+from psyclone.psyir.tools.dependency_tools import (DependencyTools)
 
 RESOLVE_IMPORTS = True
 
@@ -17,6 +19,7 @@ class Colour:
   UNDERLINE = '\033[4m'
 
 def trans(psyir):
+  use_dep_tools = os.getenv("USE_DEP_TOOLS", "no")
   timeout = int(os.getenv("TIMEOUT", "5000"))
   bv_width = int(os.getenv("BITVEC_WIDTH", "32"))
   use_int = os.getenv("USE_INTEGERS", "no")
@@ -40,10 +43,22 @@ def trans(psyir):
                   use_bv = use_bv,
                   smt_timeout_ms = timeout,
                   prohibit_overflow = no_overflow == "yes")
-      conflict_free = ArrayIndexAnalysis(options).is_loop_conflict_free(loop)
-      if conflict_free is None:
-        print(Colour.FAIL + "timeout" + Colour.ENDC)
-      elif conflict_free:
-        print(Colour.OKGREEN + "conflict free" + Colour.ENDC)
-      else:
-        print(Colour.FAIL + "conflicts" + Colour.ENDC)
+      analysis = ArrayIndexAnalysis(options)
+      dep_tools = DependencyTools()
+      try:
+        start = time.time()
+        if use_dep_tools == "yes":
+            conflict_free = dep_tools.can_loop_be_parallelised(
+                               loop, test_all_variables=True)
+        else:
+            conflict_free = analysis.is_loop_conflict_free(loop)
+        end = time.time()
+        if conflict_free is None:
+          print(Colour.FAIL + "timeout" + Colour.ENDC, end="")
+        elif conflict_free:
+          print(Colour.OKGREEN + "conflict free" + Colour.ENDC, end="")
+        else:
+          print(Colour.FAIL + "conflicts" + Colour.ENDC, end="")
+        print(" (%.3f" % (end-start), "s)", sep="")
+      except Exception:
+        print(Colour.FAIL + " exception" + Colour.ENDC)
